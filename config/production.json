@@ -1,8 +1,11 @@
 {
   "trello": {
-    "auth": {
-      "key":"your-trello-key-here",
-      "token":"your-trello-token-here"
-    }
+    "authKey":"your-trello-key-here",
+    "authToken":"your-trello-token-here",
+    "memberId":"your-trello-account-name"
+  },
+  "output": {
+    "path":"output",
+    "suffix":"false"
   }
 }
