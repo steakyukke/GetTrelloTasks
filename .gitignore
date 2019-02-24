@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+.eslintrc.json
+.vscode/
+config/development.json
+.DS_Store
+.bak
+
+output/
