@@ -9,8 +9,8 @@ let trello = new Trello(config.trello.authKey, config.trello.authToken);
 
 // ファイル出力関連
 const outputPath = config.output.path;
-let filePath = outputPath + '/';
-// let filePath = outputPath + '/' + memberId + '/';
+// let filePath = outputPath + '/';
+let filePath = outputPath + '/' + memberId + '/';
 if (config.output.suffix === 'true') {
   let now = new Date();
   filePath += now.toFormat('YYYYMMDDHH24MI/');
@@ -19,48 +19,70 @@ if (!fs.existsSync(filePath)) {
   fs.mkdirSync(filePath);
 }
 
-// let text = '';    // ファイル出力用バッファー
-let boards = [] ;
-
+// 全ボード取得
 let boardsPromise = trello.getBoards(memberId);
 boardsPromise.then((json) => {
-  // 全ボード取得
-  boards = json;
 
-  // ボード毎にカード取得
+  // ボード毎にカード取得するPromise作成
   let promises = [];
-  console.log('max:' + json.length);
   for (let i = 0, max = json.length; i < max; i++) {
-    promises.push(exportCardsPromise(json[i]));
+    promises.push(addCardsToBoard(json[i]));
   }
+ 
+  // ボード・カードの情報を整形して出力
   Promise.all(promises)
-    // .then((json) => {
-    //   console.dir(json);
-    //   cards = json;
-    //   console.dir(cards);
+    .then((boards) => {
+      console.log('boards.length' + boards.length);
+      fs.writeFileSync(filePath + 'boards.json', JSON.stringify(boards, null, 2));
+      // Todoist書式で出力
+      let textTodoist = '';
+      let textSpreadsheet = '';
+      boards.forEach((board) => {
+        if (!board.cards) {
+          return;
+        }
+        console.log('board.cards.length' + board.cards.length);
+        textTodoist += '[' + board.name + '](' + board.shortUrl + ')\n';
+        textSpreadsheet += '=HYPERLINK("' + board.shortUrl + '","<' + board.name + '>")\n';
+        board.cards.forEach((card) => {
+          textTodoist += '...[' + card.name +'](' + card.shortUrl + ')\n';
+          textSpreadsheet += '=HYPERLINK("' + card.shortUrl + '","' + card.name + '")\n';
+        });
+        textTodoist += '\n';
+        textSpreadsheet += '\n';
+      });
 
-    // }).then(() => {
-      // // 取得した情報をファイル出力
-      // fs.writeFileSync(flileName, JSON.stringify(boards, null, 2));
-      // fs.writeFileSync(flileName + '.2', JSON.stringify(cards, null, 2));
-    // });
-
+      fs.writeFileSync(filePath + '_todoist.txt', textTodoist);
+      fs.writeFileSync(filePath + '_spreadheet.txt', textSpreadsheet);
+    },
+    (error) => {
+      console.log('error');
+    });
 });
 
-function exportCardsPromise(board) {
-  let cardsPromise = trello.getCardsOnBoard(board.id);
-  cardsPromise.then((json) => {
-    if (json.length !== 0) {
-      let cards = [] ;
-      let boadWk = {};
-      cards = json;
-      boadWk = board;
-      boadWk.cards = cards;
-      boards.push(boadWk);
+////////////////////////////////////////////////////////////////////////////////
+// メソッド
+////////////////////////////////////////////////////////////////////////////////
 
-      // 取得した情報をファイル一旦出力
-      let flileName = filePath + board.name + '.json';
-      fs.writeFileSync(flileName, JSON.stringify(boadWk, null, 2));
-    }
+// ボードにカード情報を付加
+function addCardsToBoard(board) {
+
+  return new Promise((resolve, reject) => {
+
+    trello.getCardsOnBoard(board.id, (error, json) => {
+      if (error) {
+        reject('Could not add card:' + error);
+        return;
+      }
+
+      console.log('card.length: ' + json.length);
+      if (json.length !== 0) {
+        board.cards = json;
+  
+        // 取得した情報をファイル一旦出力
+        fs.writeFileSync(filePath + board.name + '.json', JSON.stringify(board, null, 2));
+      }
+      resolve(board);
+    });
   });
 }
